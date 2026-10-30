@@ -1,0 +1,9 @@
+# 작성용 시작 파일. 실제 operation과 schema를 정의하고 이 주석을 제거한다.
+# paths가 비어 있는 상태를 구현 가능한 API 계약으로 전달하지 않는다.
+# 인증 방식이 합의되면 securitySchemes와 security를 명시한다.
+# 각 operation에 operationId와 x-requirements: [REQ-001, AC-001]를 부여한다.
+openapi: 3.1.0
+info:
+  title: "{{프로젝트 API 이름}}"
+  version: "{{API 계약 버전}}"
+paths: {}
