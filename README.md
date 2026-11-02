@@ -76,7 +76,7 @@ $skill-installer minkim11/project-docs-skill 저장소 루트의 스킬을 개�
 
 ```text
 $project-docs 지금까지 합의한 기획으로 전체 PRD와 MVP 0.1, 관련 기술 명세를 만들어줘.
-대상 폴더는 C:\Users\alsgu\projects\my-app이야.
+대상 폴더는 C:\projects\my-app이야.
 ```
 
 필요한 문서만 요청할 수도 있습니다.
