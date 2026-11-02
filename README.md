@@ -93,7 +93,7 @@ $project-docs 지금까지 합의한 기획으로 전체 PRD와 MVP 0.1, 관련 
 | 문서 | 담는 내용 |
 |---|---|
 | `docs/product/PRD.md` | 제품 목적, 사용자, 전체 경험, 장기 방향 |
-| `docs/implementation/MVP.md` | 현재 버전의 동작, 제외 범위, 검증 가능한 완료 기준 |
+| `docs/v<version>/MVP.md` | 해당 버전의 동작, 제외 범위, 검증 가능한 완료 기준 |
 | `docs/implementation/ARCHITECTURE.md` | 기술스택, 초기화 명세, 모듈·패키지 구조와 의존 방향 |
 | `docs/implementation/CONVENTIONS.md` | 코드 규칙, 포매터·린터 설정 계획, 검사 명령 |
 | `docs/implementation/DATA_MODEL.md` | 저장 구조, ERD, 필드·관계·제약조건 |
@@ -102,6 +102,8 @@ $project-docs 지금까지 합의한 기획으로 전체 PRD와 MVP 0.1, 관련 
 | `AGENTS.md` | 읽기 경계, 작업별 참고 문서와 검증 지침 |
 
 요청한 산출물과 프로젝트에 필요한 문서만 작성합니다. 데이터 모델은 저장 요구가 있을 때, OpenAPI는 HTTP API가 있을 때, ADR은 기록할 결정이 있을 때 추가합니다.
+
+MVP만 `docs/v0.1/MVP.md`, `docs/v0.2/MVP.md`처럼 버전별로 보관합니다. 기술 문서는 공통 `docs/implementation/`에서 현행 기준 한 벌로 관리합니다. AGENTS의 현재 MVP 링크로 대상을 지정하며, 높은 버전 폴더가 생겨도 자동 전환하지 않습니다. 과거 MVP에서 연결한 공통 기술 문서는 최신 내용이므로, 당시 기술 명세가 필요하면 Git 이력을 확인합니다.
 
 ## 문서 검증
 

@@ -12,6 +12,7 @@ from urllib.parse import unquote, urlsplit
 
 ID = re.compile(r"\b(?:REQ|AC)-\d{3,}\b")
 METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
+MVP_LOCATION = re.compile(r"docs/v([A-Za-z0-9][A-Za-z0-9._-]*)/MVP\.md")
 
 
 def prose(text):
@@ -44,7 +45,7 @@ def anchors(text):
 
 
 class Validator:
-    def __init__(self, root, include_product=False, require_implementation=False):
+    def __init__(self, root, include_product=False, require_implementation=False, mvp_path=None):
         self.root = Path(root).resolve()
         self.include_product = include_product
         self.require_implementation = require_implementation
@@ -52,6 +53,8 @@ class Validator:
         self.docs = {}
         self.ids = set()
         self.version = None
+        self.requested_mvp = mvp_path
+        self.mvp_path = None
 
     def report(self, level, path, code, message):
         self.issues.append((level, path, code, message))
@@ -66,7 +69,8 @@ class Validator:
             folders = ["docs/implementation", "docs/decisions"]
             if self.include_product:
                 folders.append("docs/product")
-            if resolved != self.root / "AGENTS.md" and not any(resolved.is_relative_to(self.root / folder) for folder in folders):
+            selected_mvp = self.root / self.mvp_path if self.mvp_path else None
+            if resolved not in (self.root / "AGENTS.md", selected_mvp) and not any(resolved.is_relative_to(self.root / folder) for folder in folders):
                 self.report("SKIP", relative, "read-scope", "Resolved document is outside selected scope.")
                 return None
             return path.read_text(encoding="utf-8-sig")
@@ -91,7 +95,7 @@ class Validator:
             self.report("ERROR", ".", "root", "Project root does not exist.")
             return self.issues
         if self.require_implementation:
-            for relative in ("AGENTS.md", "docs/implementation/MVP.md",
+            for relative in ("AGENTS.md",
                              "docs/implementation/ARCHITECTURE.md", "docs/implementation/CONVENTIONS.md"):
                 if not self.is_file(relative):
                     self.report("ERROR", relative, "required-file", "Required handoff document is missing.")
@@ -102,18 +106,28 @@ class Validator:
         for folder in folders:
             # walk reports inaccessible subdirectories instead of silently omitting them.
             def scan_error(exc):
-                if not isinstance(exc, FileNotFoundError) or Path(exc.filename) != self.root / folder:
+                if not (isinstance(exc, FileNotFoundError) and exc.filename is not None
+                        and Path(exc.filename) == self.root / folder):
                     self.report("ERROR", folder, "scan", str(exc))
 
-            for parent, directories, files in os.walk(self.root / folder, onerror=scan_error):
-                directories.sort()
-                candidates.extend(Path(parent) / name for name in sorted(files) if name.endswith(".md"))
+            try:
+                for parent, directories, files in os.walk(self.root / folder, onerror=scan_error):
+                    directories.sort()
+                    candidates.extend(Path(parent) / name for name in sorted(files) if name.endswith(".md"))
+            except (OSError, RecursionError) as exc:
+                scan_error(exc)
         for path in candidates:
             relative = path.relative_to(self.root).as_posix()
+            if relative == "docs/implementation/MVP.md":
+                self.report("ERROR", relative, "legacy-mvp", "Legacy MVP path; migrate only when the project layout change is authorized.")
+                continue
             if self.is_file(relative):
                 text = self.read(relative)
                 if text is not None:
                     self.docs[relative] = text
+        self.select_mvp()
+        if self.require_implementation and not self.mvp_path:
+            self.report("ERROR", "AGENTS.md", "mvp-selection", "Handoff requires a valid current MVP entry in AGENTS.md.")
         api = "docs/implementation/openapi.yaml"
         api_exists = self.is_file(api)
         if not self.docs and not api_exists:
@@ -129,9 +143,9 @@ class Validator:
                     self.report("ERROR", relative, "mvp-version", "Missing '적용 MVP: <version>'.")
                 elif self.version and version[1] != self.version:
                     self.report("ERROR", relative, "mvp-version", f"Expected MVP {self.version}, found {version[1]}.")
-            if relative == "AGENTS.md" or relative.startswith("docs/implementation/"):
-                if "docs/implementation/MVP.md" in self.docs:
-                    active = re.sub(r"^- 변경 요약:.*?(?=^## |\Z)", "", body, flags=re.M | re.S) if relative.endswith("/MVP.md") else body
+            if relative in ("AGENTS.md", self.mvp_path) or relative.startswith("docs/implementation/"):
+                if self.mvp_path in self.docs:
+                    active = re.sub(r"^- 변경 요약:.*?(?=^## |\Z)", "", body, flags=re.M | re.S) if relative == self.mvp_path else body
                     for identifier in sorted(set(ID.findall(active)) - self.ids):
                         self.report("ERROR", relative, "unknown-id", f"{identifier} is not defined in current MVP.")
             self.links(relative, body)
@@ -139,18 +153,53 @@ class Validator:
             self.openapi(api)
         return self.issues
 
+    def select_mvp(self):
+        target = self.requested_mvp
+        if target is None or self.require_implementation:
+            entries = re.findall(r"^- 현재 MVP:[^\n]*$", prose(self.docs.get("AGENTS.md", "")), re.M)
+            if not entries:
+                if self.require_implementation:
+                    self.report("ERROR", "AGENTS.md", "mvp-selection", "Handoff requires the current MVP entry, even with --mvp.")
+                elif any(path.startswith("docs/implementation/") for path in self.docs):
+                    self.report("SKIP", "AGENTS.md", "mvp-selection", "No current MVP entry; no version is selected automatically.")
+                return
+            match = re.fullmatch(r"- 현재 MVP:\s*\[[^\]\n]+\]\(([^)\n]+)\)\s*", entries[0])
+            if len(entries) != 1 or not match:
+                self.report("ERROR", "AGENTS.md", "mvp-selection", "Expected exactly one '- 현재 MVP: [MVP](docs/v<version>/MVP.md)' entry.")
+                return
+            current = match[1]
+            if not MVP_LOCATION.fullmatch(current):
+                self.report("ERROR", "AGENTS.md", "mvp-selection", "Current MVP entry must use docs/v<version>/MVP.md with no query or fragment.")
+                return
+            if target is None:
+                target = current
+            elif target != current:
+                self.report("ERROR", "AGENTS.md", "mvp-handoff", f"Handoff target {target} differs from current MVP {current}.")
+        if not isinstance(target, str) or not MVP_LOCATION.fullmatch(target):
+            self.report("ERROR", "AGENTS.md", "mvp-selection", "MVP target must be docs/v<version>/MVP.md with no query or fragment.")
+            return
+        self.mvp_path = target
+        if not self.is_file(target):
+            self.report("ERROR", target, "required-file", "Selected MVP does not exist.")
+            return
+        text = self.read(target)
+        if text is not None:
+            self.docs[target] = text
+
     def mvp(self):
-        relative = "docs/implementation/MVP.md"
+        relative = self.mvp_path
         if relative not in self.docs:
             if any(ID.search(prose(text)) for path, text in self.docs.items()
                    if path == "AGENTS.md" or path.startswith("docs/implementation/")):
-                self.report("SKIP", relative, "id-check", "Current MVP unavailable; cannot resolve REQ/AC references.")
+                self.report("SKIP", relative or "AGENTS.md", "id-check", "Selected MVP unavailable; cannot resolve REQ/AC references.")
             return
         body = prose(self.docs[relative])
         version = re.search(r"^- 버전:\s*(\S+)\s*$", body, re.M)
         status = re.search(r"^- 상태:\s*(Draft|Ready)\s*$", body, re.M)
         if version:
             self.version = version[1]
+            if MVP_LOCATION.fullmatch(relative)[1] != self.version:
+                self.report("ERROR", relative, "mvp-folder-version", "MVP header version does not match its version directory.")
         else:
             self.report("ERROR", relative, "metadata", "Missing '- 버전: <version>'.")
         if not status:
@@ -213,9 +262,31 @@ class Validator:
         except ImportError:
             self.report("SKIP", relative, "yaml-parser", "PyYAML unavailable; YAML and API checks not run. No installation attempted.")
             return
+
+        checked_mappings = set()
+
+        class UniqueKeyLoader(yaml.SafeLoader):
+            def flatten_mapping(loader, node):
+                # Check explicit keys before YAML merges insert inherited keys.
+                if id(node) not in checked_mappings:
+                    checked_mappings.add(id(node))
+                    seen = set()
+                    for key_node, _ in node.value:
+                        key = "<<" if key_node.tag == "tag:yaml.org,2002:merge" else loader.construct_object(key_node)
+                        try:
+                            duplicate = key in seen
+                            seen.add(key)
+                        except TypeError as exc:
+                            raise yaml.constructor.ConstructorError("while constructing a mapping", node.start_mark,
+                                                                    "found an unhashable key", key_node.start_mark) from exc
+                        if duplicate:
+                            raise yaml.constructor.ConstructorError("while constructing a mapping", node.start_mark,
+                                                                    f"found duplicate key {key!r}", key_node.start_mark)
+                return super().flatten_mapping(node)
+
         try:
-            api = yaml.safe_load(text)
-        except yaml.YAMLError as exc:
+            api = yaml.load(text, Loader=UniqueKeyLoader)
+        except (yaml.YAMLError, ValueError, OverflowError) as exc:
             self.report("ERROR", relative, "yaml", str(exc))
             return
         except RecursionError:
@@ -234,7 +305,7 @@ class Validator:
         if not isinstance(paths, dict) or not paths:
             self.report("ERROR", relative, "api-paths", "paths must contain the current HTTP contract.")
             return
-        if "docs/implementation/MVP.md" not in self.docs:
+        if self.mvp_path not in self.docs:
             self.report("SKIP", relative, "id-check", "Current MVP unavailable; cannot resolve x-requirements.")
 
         def pointer(ref):
@@ -248,25 +319,40 @@ class Validator:
                 self.report("ERROR", relative, "api-ref", f"Unresolved JSON Pointer: {ref}")
                 return None
 
-        visited, pending = set(), [api]
+        named_maps = {"paths", "webhooks", "schemas", "properties", "patternProperties", "$defs", "definitions",
+                      "dependentSchemas", "dependencies", "responses", "headers", "parameters", "requestBodies",
+                      "callbacks", "links", "securitySchemes", "content", "encoding"}
+        literals = {"example", "default", "const", "enum"}
+        visited, pending = set(), [(api, "object")]
         while pending:
-            node = pending.pop()
+            node, kind = pending.pop()
             if isinstance(node, (dict, list)):
-                if id(node) in visited:
+                identity = (id(node), kind)
+                if identity in visited:
                     continue
-                visited.add(id(node))
+                visited.add(identity)
             if isinstance(node, dict):
-                ref = node.get("$ref")
+                is_names = kind in {"names", "example-names"}
+                ref = node.get("$ref") if not is_names else None
                 if isinstance(ref, str):
                     if ref.startswith("#/"):
                         pointer(ref)
                     else:
                         self.report("SKIP", relative, "api-ref-scope", f"External or named-anchor reference not resolved: {ref}")
                 for key, value in node.items():
-                    if key not in {"example", "examples", "default", "const", "enum"}:
-                        pending.append(value)
+                    if is_names:
+                        pending.append((value, "example-object" if kind == "example-names" else "object"))
+                    elif key in literals or (kind == "example-object" and key == "value"):
+                        continue
+                    elif isinstance(key, str) and key.startswith("x-"):
+                        continue
+                    elif key == "examples":
+                        if isinstance(value, dict):
+                            pending.append((value, "example-names"))
+                    else:
+                        pending.append((value, "names" if key in named_maps else "object"))
             elif isinstance(node, list):
-                pending.extend(node)
+                pending.extend((value, "object") for value in node)
         seen, operations, referenced_items = set(), 0, False
         for path, item in paths.items():
             if not isinstance(path, str) or not path.startswith("/") or not isinstance(item, dict):
@@ -294,7 +380,7 @@ class Validator:
                 linked = operation.get("x-requirements")
                 if not isinstance(linked, list) or not linked or any(not isinstance(x, str) or not ID.fullmatch(x) for x in linked):
                     self.report("ERROR", relative, "api-requirements", f"{label}: x-requirements must be a nonempty REQ/AC ID array.")
-                elif "docs/implementation/MVP.md" in self.docs:
+                elif self.mvp_path in self.docs:
                     for identifier in sorted(set(linked) - self.ids):
                         self.report("ERROR", relative, "unknown-id", f"{label}: unknown {identifier}.")
         if not operations and not referenced_items:
@@ -307,10 +393,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("project_root", type=Path, help="Target project, not the skill/template directory")
     parser.add_argument("--include-product", action="store_true", help="Also read docs/product (planning/MVP scope work only)")
-    parser.add_argument("--require-implementation", action="store_true", help="Require the four core implementation handoff documents")
+    parser.add_argument("--mvp", help="Explicit docs/v<version>/MVP.md target; otherwise use the current MVP entry in AGENTS.md")
+    parser.add_argument("--require-implementation", action="store_true", help="Require core handoff documents and agreement with AGENTS.md's current MVP")
     args = parser.parse_args()
     try:
-        validator = Validator(args.project_root, args.include_product, args.require_implementation)
+        validator = Validator(args.project_root, args.include_product, args.require_implementation, args.mvp)
     except (OSError, ValueError, RuntimeError) as exc:
         print(f"ERROR . [root] Cannot resolve project root: {exc}")
         return 1

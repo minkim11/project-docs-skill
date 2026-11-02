@@ -30,6 +30,8 @@ Save the user's text.
 | AC-001 | REQ-001 | Saving text returns the saved note. |
 """
 
+CURRENT = "- 현재 MVP: [MVP](docs/v0.1/MVP.md)\n"
+
 API = """openapi: 3.1.0
 info: {title: Notes, version: '1.0'}
 paths:
@@ -54,10 +56,10 @@ class ValidationTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
-        self.write("docs/implementation/MVP.md", MVP)
+        self.write("docs/v0.1/MVP.md", MVP)
         self.write("docs/implementation/ARCHITECTURE.md", "# Architecture\n\n적용 MVP: 0.1\n\nREQ-001\n")
         self.write("docs/implementation/CONVENTIONS.md", "# Conventions\n\n적용 MVP: 0.1\n")
-        self.write("AGENTS.md", "[MVP](docs/implementation/MVP.md#완료-기준)\n")
+        self.write("AGENTS.md", CURRENT + "[Criteria](docs/v0.1/MVP.md#완료-기준)\n")
 
     def write(self, relative, text):
         path = self.root / relative
@@ -77,15 +79,15 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(before, after)
 
     def test_id_duplicates_dangling_refs_and_coverage(self):
-        self.write("docs/implementation/MVP.md", MVP + "\n### REQ-001 — Duplicate\n### REQ-002 — Uncovered\nREQ-999\n")
+        self.write("docs/v0.1/MVP.md", MVP + "\n### REQ-001 — Duplicate\n### REQ-002 — Uncovered\nREQ-999\n")
         self.assertTrue({"duplicate-id", "req-coverage", "unknown-id"} <= self.codes())
 
     def test_empty_acceptance_condition(self):
-        self.write("docs/implementation/MVP.md", MVP.replace("Saving text returns the saved note.", ""))
+        self.write("docs/v0.1/MVP.md", MVP.replace("Saving text returns the saved note.", ""))
         self.assertIn("ac-condition", self.codes())
 
     def test_retired_ids_in_change_summary_are_historical(self):
-        self.write("docs/implementation/MVP.md", MVP.replace("- 상태: Draft", "- 상태: Draft\n- 변경 요약: REQ-099 was replaced by REQ-001."))
+        self.write("docs/v0.1/MVP.md", MVP.replace("- 상태: Draft", "- 상태: Draft\n- 변경 요약: REQ-099 was replaced by REQ-001."))
         self.assertEqual([], self.issues())
 
     def test_versions_links_and_placeholders(self):
@@ -93,16 +95,16 @@ class ValidationTests(unittest.TestCase):
         self.assertTrue({"mvp-version", "placeholder", "link"} <= self.codes())
 
     def test_anchor_and_reference_definition(self):
-        self.write("AGENTS.md", "[MVP][spec]\n[spec]: docs/implementation/MVP.md#missing\n")
+        self.write("AGENTS.md", CURRENT + "[MVP][spec]\n[spec]: docs/v0.1/MVP.md#missing\n")
         self.assertIn("anchor", self.codes())
 
     def test_examples_are_not_active_links_or_requirements(self):
-        self.write("AGENTS.md", "```md\nREQ-999 {{example}} [gone](missing.md)\n```\n`[gone](missing.md)`\n")
+        self.write("AGENTS.md", CURRENT + "```md\nREQ-999 {{example}} [gone](missing.md)\n```\n`[gone](missing.md)`\n")
         self.assertEqual([], self.issues())
 
     def test_prd_not_read_without_explicit_option_even_via_link(self):
         self.write("docs/product/PRD.md", "# Product\n{{unfinished}}\n")
-        self.write("AGENTS.md", "[Product](docs/product/PRD.md#product)\n")
+        self.write("AGENTS.md", CURRENT + "[Product](docs/product/PRD.md#product)\n")
         original = module.Validator.read
         with patch.object(module.Validator, "read", autospec=True, side_effect=original) as read:
             self.assertEqual({"anchor-scope"}, self.codes())
@@ -115,15 +117,99 @@ class ValidationTests(unittest.TestCase):
         self.assertIn("required-file", self.codes(require_implementation=True))
 
     def test_missing_mvp_is_unverified_not_a_success(self):
-        (self.root / "docs/implementation/MVP.md").unlink()
-        self.assertTrue(any(item[:3] == ("SKIP", "docs/implementation/MVP.md", "id-check") for item in self.issues()))
+        (self.root / "docs/v0.1/MVP.md").unlink()
+        self.assertTrue(any(item[:3] == ("SKIP", "docs/v0.1/MVP.md", "id-check") for item in self.issues()))
+
+    def test_other_versions_are_not_read_even_with_product_scope(self):
+        self.write("docs/v0.0/MVP.md", MVP + "\n{{historical unfinished template}}\n")
+        self.write("docs/v0.2/MVP.md", "{{future draft}} REQ-999\n")
+        self.write("docs/product/PRD.md", "# Product\n")
+        original = module.Validator.read
+        for include_product in (False, True):
+            with self.subTest(include_product=include_product):
+                with patch.object(module.Validator, "read", autospec=True, side_effect=original) as read:
+                    self.assertEqual([], self.issues(include_product=include_product))
+                    read_paths = [call.args[1] for call in read.call_args_list]
+                    self.assertNotIn("docs/v0.0/MVP.md", read_paths)
+                    self.assertNotIn("docs/v0.2/MVP.md", read_paths)
+
+    def test_explicit_mvp_overrides_current_without_reading_it(self):
+        self.write("AGENTS.md", CURRENT)
+        self.write("docs/v0.2/MVP.md", MVP.replace("0.1", "0.2").replace("REQ-001", "REQ-002").replace("AC-001", "AC-002"))
+        self.write("docs/implementation/ARCHITECTURE.md", "적용 MVP: 0.2\nREQ-002\n")
+        self.write("docs/implementation/CONVENTIONS.md", "적용 MVP: 0.2\n")
+        self.write("docs/implementation/openapi.yaml", API.replace("REQ-001", "REQ-002").replace("AC-001", "AC-002"))
+        original = module.Validator.read
+        with patch.object(module.Validator, "read", autospec=True, side_effect=original) as read:
+            issues = self.issues(mvp_path="docs/v0.2/MVP.md")
+        if importlib.util.find_spec("yaml"):
+            self.assertEqual([], issues)
+        else:
+            self.assertEqual({"yaml-parser"}, {item[2] for item in issues})
+        self.assertNotIn("docs/v0.1/MVP.md", [call.args[1] for call in read.call_args_list])
+        (self.root / "docs/implementation/openapi.yaml").unlink()
+        result = subprocess.run([sys.executable, "-B", str(SCRIPT), str(self.root), "--mvp", "docs/v0.2/MVP.md"], capture_output=True)
+        self.assertEqual(0, result.returncode)
+
+    def test_missing_pointer_never_selects_the_latest_folder(self):
+        self.write("AGENTS.md", "# Instructions\n")
+        self.write("docs/v99.0/MVP.md", MVP)
+        validator = module.Validator(self.root)
+        self.assertIn("mvp-selection", {item[2] for item in validator.run()})
+        self.assertIsNone(validator.mvp_path)
+        self.assertNotIn("docs/v99.0/MVP.md", validator.docs)
+        self.assertTrue(any(item[0] == "ERROR" and item[2] == "mvp-selection" for item in self.issues(require_implementation=True)))
+
+    def test_handoff_override_must_agree_with_current_mvp(self):
+        self.write("AGENTS.md", CURRENT)
+        self.write("docs/v0.2/MVP.md", MVP.replace("0.1", "0.2"))
+        self.write("docs/implementation/ARCHITECTURE.md", "적용 MVP: 0.2\nREQ-001\n")
+        self.write("docs/implementation/CONVENTIONS.md", "적용 MVP: 0.2\n")
+        self.assertEqual([], self.issues(mvp_path="docs/v0.2/MVP.md"))
+        self.assertIn("mvp-handoff", self.codes(mvp_path="docs/v0.2/MVP.md", require_implementation=True))
+        self.write("AGENTS.md", CURRENT.replace("v0.1", "v0.2"))
+        self.assertEqual([], self.issues(mvp_path="docs/v0.2/MVP.md", require_implementation=True))
+
+    def test_handoff_override_does_not_bypass_missing_or_ambiguous_entry(self):
+        for content in ("# Instructions\n", CURRENT + CURRENT, CURRENT.replace("docs/v0.1/MVP.md", "docs/product/PRD.md")):
+            with self.subTest(content=content):
+                self.write("AGENTS.md", content)
+                self.assertIn("mvp-selection", self.codes(mvp_path="docs/v0.1/MVP.md", require_implementation=True))
+
+    def test_ambiguous_pointer_is_an_error(self):
+        self.write("AGENTS.md", CURRENT + CURRENT)
+        self.assertIn("mvp-selection", self.codes())
+
+    def test_invalid_mvp_targets_cannot_open_product_or_other_paths(self):
+        self.write("docs/product/PRD.md", "# Private planning document\n")
+        original = module.Validator.read
+        for target in ("docs/product/PRD.md", "../PRD.md", "docs/v0.1/../product/PRD.md", "docs/v0.1/MVP.md#heading"):
+            with self.subTest(target=target):
+                with patch.object(module.Validator, "read", autospec=True, side_effect=original) as read:
+                    self.assertIn("mvp-selection", self.codes(mvp_path=target))
+                    self.assertNotIn("docs/product/PRD.md", [call.args[1] for call in read.call_args_list])
+
+    def test_mvp_version_must_match_its_folder(self):
+        self.write("docs/v0.1/MVP.md", MVP.replace("0.1", "0.2"))
+        self.assertIn("mvp-folder-version", self.codes())
+
+    def test_versioned_mvp_can_link_to_shared_contract(self):
+        self.write("docs/v0.1/MVP.md", MVP + "\n[Architecture](../implementation/ARCHITECTURE.md#architecture)\n")
+        self.assertEqual([], self.issues())
+
+    def test_legacy_layout_is_reported_without_reading_legacy_mvp(self):
+        self.write("docs/implementation/MVP.md", "{{legacy document}}\n")
+        original = module.Validator.read
+        with patch.object(module.Validator, "read", autospec=True, side_effect=original) as read:
+            self.assertIn("legacy-mvp", self.codes())
+        self.assertNotIn("docs/implementation/MVP.md", [call.args[1] for call in read.call_args_list])
 
     def test_link_outside_root_not_opened(self):
-        self.write("AGENTS.md", "[outside](../secret.md#heading)\n")
+        self.write("AGENTS.md", CURRENT + "[outside](../secret.md#heading)\n")
         self.assertIn("outside-root", self.codes())
 
     def test_invalid_link_does_not_abort_other_links_or_documents(self):
-        self.write("AGENTS.md", "[invalid](bad%00path.md)\n[missing](gone.md)\n")
+        self.write("AGENTS.md", CURRENT + "[invalid](bad%00path.md)\n[missing](gone.md)\n")
         self.write("docs/implementation/CONVENTIONS.md", "적용 MVP: 0.2\n")
         issues = self.issues()
         self.assertEqual(2, sum(issue[2] == "link" for issue in issues))
@@ -166,8 +252,36 @@ class ValidationTests(unittest.TestCase):
         with patch.object(module.os, "walk", side_effect=walk):
             self.assertTrue({"scan", "placeholder"} <= self.codes())
 
+    def test_scan_error_without_filename_does_not_abort_other_directories(self):
+        original = module.os.walk
+
+        def walk(path, onerror):
+            if path.name == "implementation":
+                onerror(FileNotFoundError("Directory disappeared without a filename"))
+                return iter(())
+            return original(path, onerror=onerror)
+
+        self.write("docs/decisions/0001-storage.md", "{{unfilled}}\n")
+        with patch.object(module.os, "walk", side_effect=walk):
+            self.assertTrue({"scan", "placeholder"} <= self.codes())
+
+    def test_scan_iterator_failure_does_not_abort_other_directories(self):
+        original = module.os.walk
+
+        def walk(path, onerror):
+            if path.name == "implementation":
+                yield str(path), [], ["ARCHITECTURE.md"]
+                raise failure("Scanning interrupted")
+            yield from original(path, onerror=onerror)
+
+        self.write("docs/decisions/0001-storage.md", "{{unfilled}}\n")
+        for failure in (OSError, RecursionError):
+            with self.subTest(failure=failure.__name__):
+                with patch.object(module.os, "walk", side_effect=walk):
+                    self.assertTrue({"scan", "placeholder"} <= self.codes())
+
     def test_cli_reports_unicode_errors_under_ascii_output(self):
-        self.write("AGENTS.md", "[missing](missing-🌱.md)\n")
+        self.write("AGENTS.md", CURRENT + "[missing](missing-🌱.md)\n")
         result = subprocess.run([sys.executable, "-B", str(SCRIPT), str(self.root)],
                                 capture_output=True, env={**os.environ, "PYTHONIOENCODING": "ascii"})
         self.assertEqual(1, result.returncode)
@@ -179,6 +293,7 @@ class ValidationTests(unittest.TestCase):
         with patch.object(module.Path, "resolve", return_value=self.root / "docs/product/PRD.md"):
             validator = module.Validator.__new__(module.Validator)
             validator.root, validator.include_product, validator.issues = self.root, False, []
+            validator.mvp_path = None
             self.assertIsNone(validator.read("AGENTS.md"))
             self.assertEqual("read-scope", validator.issues[0][2])
 
@@ -204,6 +319,86 @@ class ValidationTests(unittest.TestCase):
         self.assertNotIn(b"Traceback", result.stderr)
 
     @unittest.skipUnless(importlib.util.find_spec("yaml"), "PyYAML not installed")
+    def test_duplicate_yaml_keys_are_errors(self):
+        duplicate_path = API.replace("paths:\n", "paths:\n  /notes:\n    get:\n      operationId: lostGet\n      x-requirements: [REQ-999]\n")
+        duplicate_schema = API.replace("Note: {type: object}", "Note: {type: object, type: string}")
+        duplicate_info = API.replace("title: Notes", "title: First, title: Notes")
+        for contract in (duplicate_path, duplicate_schema, duplicate_info):
+            with self.subTest(contract=contract):
+                self.write("docs/implementation/openapi.yaml", contract)
+                self.assertIn("yaml", self.codes())
+
+    @unittest.skipUnless(importlib.util.find_spec("yaml"), "PyYAML not installed")
+    def test_yaml_merge_override_is_allowed_but_duplicate_base_keys_are_not(self):
+        contract = API.replace("info: {title: Notes, version: '1.0'}",
+                               "x-info-defaults: &base {title: Base, version: '1.0'}\ninfo:\n  <<: *base\n  title: Notes")
+        self.write("docs/implementation/openapi.yaml", contract)
+        self.assertEqual([], self.issues())
+        self.write("docs/implementation/openapi.yaml", contract.replace("title: Base", "title: First, title: Base"))
+        self.assertIn("yaml", self.codes())
+
+    @unittest.skipUnless(importlib.util.find_spec("yaml"), "PyYAML not installed")
+    def test_schema_names_and_properties_do_not_hide_refs(self):
+        import yaml
+        for name in ("example", "examples", "default", "const", "enum"):
+            for as_property in (False, True):
+                with self.subTest(name=name, as_property=as_property):
+                    api = yaml.safe_load(API)
+                    missing = {"$ref": "#/components/schemas/Missing"}
+                    if as_property:
+                        api["components"]["schemas"]["Note"]["properties"] = {name: missing}
+                    else:
+                        api["components"]["schemas"][name] = missing
+                    self.write("docs/implementation/openapi.yaml", yaml.safe_dump(api))
+                    self.assertIn("api-ref", self.codes())
+
+    @unittest.skipUnless(importlib.util.find_spec("yaml"), "PyYAML not installed")
+    def test_literal_example_and_schema_annotation_data_are_not_refs(self):
+        import yaml
+        api = yaml.safe_load(API)
+        literal = {"$ref": "#/not-a-contract-reference"}
+        media = api["paths"]["/notes"]["post"]["responses"]["201"]["content"]["application/json"]
+        media["example"] = literal
+        media["examples"] = {"payload": {"value": literal}}
+        schema = api["components"]["schemas"]["Note"]
+        schema.update({"default": literal, "const": literal, "enum": [literal], "examples": [literal]})
+        api["x-custom-data"] = literal
+        self.write("docs/implementation/openapi.yaml", yaml.safe_dump(api))
+        self.assertEqual([], self.issues())
+
+    @unittest.skipUnless(importlib.util.find_spec("yaml"), "PyYAML not installed")
+    def test_example_object_reference_is_checked(self):
+        import yaml
+        api = yaml.safe_load(API)
+        media = api["paths"]["/notes"]["post"]["responses"]["201"]["content"]["application/json"]
+        media["examples"] = {"payload": {"$ref": "#/components/examples/Missing"}}
+        self.write("docs/implementation/openapi.yaml", yaml.safe_dump(api))
+        self.assertIn("api-ref", self.codes())
+
+    @unittest.skipUnless(importlib.util.find_spec("yaml"), "PyYAML not installed")
+    def test_yaml_scalar_conversion_errors_are_reported_without_traceback(self):
+        self.write("docs/implementation/openapi.yaml", API + "\nx-release-date: 2026-02-30\n")
+        self.write("docs/implementation/CONVENTIONS.md", "적용 MVP: 0.2\n")
+        self.assertTrue({"yaml", "mvp-version"} <= self.codes())
+        result = subprocess.run([sys.executable, "-B", str(SCRIPT), str(self.root)], capture_output=True)
+        self.assertEqual(1, result.returncode)
+        self.assertIn(b"[yaml]", result.stdout)
+        self.assertNotIn(b"Traceback", result.stderr)
+
+    @unittest.skipUnless(importlib.util.find_spec("yaml"), "PyYAML not installed")
+    def test_unhashable_yaml_key_is_reported_without_type_error(self):
+        self.write("docs/implementation/openapi.yaml", API + "\n? [a, b]\n: invalid-key\n")
+        self.assertIn("yaml", self.codes())
+
+    @unittest.skipUnless(importlib.util.find_spec("yaml"), "PyYAML not installed")
+    def test_recursive_yaml_alias_does_not_loop_during_ref_traversal(self):
+        contract = API.replace("Note: {type: object}", "Note: &note\n      type: object\n      properties:\n        child: *note")
+        self.write("docs/implementation/openapi.yaml", contract)
+        result = subprocess.run([sys.executable, "-B", str(SCRIPT), str(self.root)], capture_output=True, timeout=10)
+        self.assertIn(b"Checked", result.stdout)
+        self.assertNotIn(b"Traceback", result.stderr)
+
+    @unittest.skipUnless(importlib.util.find_spec("yaml"), "PyYAML not installed")
     def test_api_syntax_empty_paths_and_duplicate_operations(self):
         self.write("docs/implementation/openapi.yaml", "paths: [")
         self.assertIn("yaml", self.codes())
@@ -221,7 +416,7 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(0, run("--require-implementation").returncode)
         (self.root / "AGENTS.md").unlink()
         self.assertEqual(1, run("--require-implementation").returncode)
-        self.write("AGENTS.md", "[old](docs/product/PRD.md#old)\n")
+        self.write("AGENTS.md", CURRENT + "[old](docs/product/PRD.md#old)\n")
         self.write("docs/product/PRD.md", "# Old\n")
         self.assertEqual(2, run().returncode)
 
