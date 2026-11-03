@@ -2,3 +2,6 @@ interface:
   display_name: "Project Docs"
   short_description: "기획 대화를 전체 PRD와 독립적인 MVP·API·기술 명세로 정리"
   default_prompt: "$project-docs를 사용해 지금까지 합의한 기획을 전체 PRD와 현재 MVP 구현 문서로 정리해줘."
+
+policy:
+  allow_implicit_invocation: false
