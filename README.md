@@ -94,8 +94,8 @@ $project-docs 지금까지 합의한 기획으로 전체 PRD와 MVP 0.1, 관련 
 |---|---|
 | `docs/product/PRD.md` | 제품 목적, 사용자, 전체 경험, 장기 방향 |
 | `docs/v<version>/MVP.md` | 해당 버전의 동작, 제외 범위, 검증 가능한 완료 기준 |
-| `docs/implementation/ARCHITECTURE.md` | 기술스택, 초기화 명세, 모듈·패키지 구조와 의존 방향 |
-| `docs/implementation/CONVENTIONS.md` | 코드 규칙, 포매터·린터 설정 계획, 검사 명령 |
+| `docs/implementation/ARCHITECTURE.md` | 기술스택, 초기화·실행 구성과 명령, 모듈·패키지 구조와 의존 방향 |
+| `docs/implementation/CONVENTIONS.md` | 코드 규칙, 포매터·린터 설정 기준, 검사 명령 |
 | `docs/implementation/DATA_MODEL.md` | 저장 구조, ERD, 필드·관계·제약조건 |
 | `docs/implementation/openapi.yaml` | HTTP API 요청·응답·인증·오류 계약 |
 | `docs/decisions/` | 주요 기술 결정의 이유·대안·재검토 조건과 인덱스 |
