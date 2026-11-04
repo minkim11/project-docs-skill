@@ -6,7 +6,7 @@
 |---|---|---|
 | `docs/product/PRD.md` | 제품 개요·사용자 문제, 핵심 사용자·여정, 제품 전체의 기능과 우선순위, 제품 범위·확장 방향, 판단 근거·참고 자료 | 현재 MVP·다음 버전의 상태를 관리하거나 버전별 업무 규칙·완료 기준을 복사하지 않음. 구현자가 참고하도록 링크하지 않음 |
 | `docs/v<version>/MVP.md` | 해당 버전의 동작·업무 규칙·제외 범위·완료 기준 | 기술 문서에 요구사항 본문을 복제하지 않음 |
-| `docs/implementation/ARCHITECTURE.md` | 기술스택, 초기화, Mermaid 패키지 계층과 역할별 파일·책임, 의존 방향, 실행 구성과 명령 | 코드 규칙·검사 명령·저장 필드·HTTP 상세·ADR의 논거를 복사하지 않음. 계층도와 역할 표의 정보를 재나열하지 않음 |
+| `docs/implementation/ARCHITECTURE.md` | 기술스택, 초기화, 텍스트 패키지 트리와 역할별 파일·책임, 의존 방향, 실행 구성과 명령 | 코드 규칙·검사 명령·저장 필드·HTTP 상세·ADR의 논거를 복사하지 않음. 트리와 역할 표의 정보를 재나열하지 않음 |
 | `docs/implementation/CONVENTIONS.md` | 스타일 기준, 도구 설정, 검사 범위·시점·명령, 비자동 필수 규칙과 예외 | 초기화·DB 준비·앱 사용 절차, AC 본문·테스트 매핑 표, API 오류 계약을 넣지 않음 |
 | `docs/implementation/DATA_MODEL.md` | 저장 모델과 제약·불변조건, 저장에 연결되는 비HTTP 입력 계약, 저장·전송 모델의 변환 | API schema를 저장 필드 표로 복제하거나 DB 준비 명령을 넣지 않음 |
 | `docs/implementation/openapi.yaml` | HTTP 요청·응답·인증·오류의 외부 계약 | 동일한 Markdown API 명세서를 만들지 않음 |
