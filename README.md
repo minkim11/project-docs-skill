@@ -98,7 +98,7 @@ $project-docs 지금까지 합의한 기획으로 전체 PRD와 MVP 0.1, 관련 
 | `docs/implementation/CONVENTIONS.md` | 코드 규칙, 포매터·린터 설정 기준, 검사 명령 |
 | `docs/implementation/DATA_MODEL.md` | 저장 구조, ERD, 필드·관계·제약조건 |
 | `docs/implementation/openapi.yaml` | HTTP API 요청·응답·인증·오류 계약 |
-| `docs/decisions/` | 주요 기술 결정의 이유·대안·재검토 조건과 인덱스 |
+| `docs/decisions/` | 여러 대안 중 선택한 기술 결정의 이유·트레이드오프·재검토 조건과 인덱스. 초기화·빌드 설정도 포함 |
 | `AGENTS.md` | 읽기 경계, 작업별 참고 문서와 검증 지침 |
 
 요청한 산출물과 프로젝트에 필요한 문서만 작성합니다. 데이터 모델은 저장 요구가 있을 때, OpenAPI는 HTTP API가 있을 때, ADR은 기록할 결정이 있을 때 추가합니다.
