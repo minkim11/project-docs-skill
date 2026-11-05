@@ -13,7 +13,7 @@ Project Docs는 그 내용을 전체 제품 PRD와 현재 MVP·기술 명세로 
 | 장기 계획과 현재 버전의 범위 | 전체 PRD에 제품 맥락을, MVP에 현재 동작·제외 범위·완료 기준을 기록 |
 | 확정된 결정과 아직 검토 중인 생각 | 확정·제안·미정을 구분하고, 미정이 막는 요구사항과 단계를 표시 |
 | 여러 문서에 등장하는 같은 정보 | 동작은 MVP, 저장 구조는 데이터 모델, HTTP 계약은 OpenAPI가 담당하고 ID·링크로 연결 |
-| 구체적이지 않은 기술 선택과 프로젝트 구조 | 초기화 명세·버전·옵션, 패키지 경로·책임·의존 방향을 아키텍처에 기록 |
+| 구체적이지 않은 기술 선택과 프로젝트 구조 | 전체 구성·기술스택, 패키지 구조·의존 방향, 통신·실행·배포 설계를 아키텍처에 기록 |
 | 문서별 읽기 범위와 참고 순서 | AGENTS에 읽기 경계와 작업별 참고 문서·검증 지침을 지정 |
 
 ## 동작 방식
@@ -94,7 +94,7 @@ $project-docs 지금까지 합의한 기획으로 전체 PRD와 MVP 0.1, 관련 
 |---|---|
 | `docs/product/PRD.md` | 제품 목적, 사용자, 전체 경험, 장기 방향 |
 | `docs/v<version>/MVP.md` | 해당 버전의 동작, 제외 범위, 검증 가능한 완료 기준 |
-| `docs/implementation/ARCHITECTURE.md` | 기술스택, 초기화·실행 구성과 명령, 모듈·패키지 구조와 의존 방향 |
+| `docs/implementation/ARCHITECTURE.md` | 전체 구성, 기술스택, 패키지 구조·의존 방향, 통신·실행 구조, 필요한 배포 설계와 초기화 선택값 |
 | `docs/implementation/CONVENTIONS.md` | 코드 규칙, 포매터·린터 설정 기준, 검사 명령 |
 | `docs/implementation/DATA_MODEL.md` | 저장 구조, ERD, 필드·관계·제약조건 |
 | `docs/implementation/openapi.yaml` | HTTP API 요청·응답·인증·오류 계약 |

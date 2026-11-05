@@ -21,10 +21,10 @@ metadata:
 ## 작성 흐름
 
 1. 대상 프로젝트와 작업을 식별한다: 제품/PRD 기획, MVP 작성·범위 수정, 기술 명세 수정, 문서 검토. 대상 폴더를 현재 작업 위치·사용자가 지정한 경로로 식별할 수 없으면 위치를 확인한다. 확정은 사용자가 수락했거나 선택을 위임한 범위에서 정한 내용, 제안은 수락되지 않은 선택지, 미정은 구현 결과를 바꾸는 정보가 없는 항목으로 구분한다. 이미 답한 질문을 반복하지 않는다.
-2. [문서 계약](references/document-contract.md)에서 작업에 관련된 경로·정보 소유·버전 절만 읽는다. 새 프로젝트의 초기화·구조 선정 또는 기존 구조 변경 때 [초기화와 패키지 구조 지침](references/project-layouts.md)을 추가로 읽는다. 공식 생성 골격과 프로젝트 내부 배치를 구분한다.
+2. [문서 계약](references/document-contract.md)에서 작업에 관련된 경로·정보 소유·버전 절만 읽는다. 초기화·시스템 구성·내부 구조·통신·실행·배포 설계를 정하거나 변경할 때 [아키텍처와 프로젝트 구조 지침](references/project-layouts.md)의 해당 절을 추가로 읽는다. 공식 생성 골격과 프로젝트 내부 배치를 구분한다.
 3. 기획 작업이면 전체 PRD의 사용자·문제·제품 방향을 정리한 뒤 이번 MVP에 들어갈 동작을 선별한다. 전체 PRD를 단순 축약하거나 장기 기능을 전부 구현 명세에 옮기지 않는다. MVP만 `docs/v<version>/MVP.md`에 버전별로 작성하고 이전 파일은 보존한다. 새 MVP에는 유지할 기존 동작과 새 변경을 구분해 필요한 조건을 완결되게 기록한다. 공통 기술 문서는 `docs/implementation/` 한 곳에서 관리하고 버전 폴더에 복제하지 않는다.
 4. MVP에 범위, 업무 규칙, 제외 범위, 완료 기준을 작성한다. 사용자 동작·권한·데이터 처리·공개 계약·성공 조건을 바꾸는 결정이 빠졌으면 관련 질문을 묶어 묻는다. 문서 형식·문서 파일 경로는 정해진 기본값으로 처리한다. 아키텍처·코드 배치 선택을 단순한 파일명 선택으로 취급하지 않는다. 미정은 결정할 내용·영향받는 REQ/문서·차단 단계와 함께 기록한다.
-5. 확정된 MVP와 제약에 따라 아키텍처·코드 배치를 선정한다. 특정 패턴이나 스킬 예시를 기본 설계로 강제하지 않는다. 아키텍처에는 공식 생성 방법·고정 옵션·재현 절차, 실행 구성과 명령, 모듈/역할별 경로·책임·의존 방향을 확정한다. 선택의 대안·절충 이유가 ADR에 있으면 아키텍처에서 반복하지 않는다. 저장 모델·HTTP API·ADR은 아래 생성 조건에 맞을 때 작성한다. 컨벤션 작업에는 [코드 컨벤션 기본값](references/code-style-baseline.md)을 읽어 코드 규칙·검사 설정·검사 명령만 작성한다. 기존 설정·연결 코드는 확인하되 수정하지 않는다.
+5. 확정된 MVP와 제약에 따라 시스템 구성, 내부 아키텍처와 코드 배치, 통신·실행 구조를 선정한다. 특정 패턴이나 스킬 예시를 기본 설계로 강제하지 않는다. 아키텍처에는 구성 요소의 책임·경계, 기술스택, 패키지 트리·의존 방향과 필요한 처리 흐름을 기록한다. 배포는 현재 범위에서 필요한 설계만 확정하고, 초기화는 생성 방식·식별자·선택 옵션·기본값과의 차이로 짧게 명세한다. 설치·DB 준비·실행의 작업 순서나 명령 모음은 작성하지 않는다. 대안·절충 이유는 ADR에서만 설명한다. 저장 모델·HTTP API·ADR은 아래 생성 조건에 맞을 때 작성한다. 컨벤션 작업에는 [코드 컨벤션 기본값](references/code-style-baseline.md)을 읽어 코드 규칙·검사 설정·검사 명령만 작성한다. 기존 설정·연결 코드는 확인하되 수정하지 않는다.
 6. HTTP API는 `openapi.yaml`에 먼저 정의하고 검토한 뒤 구현에 전달한다. 생성 코드나 런타임 출력이 계약을 덮어쓰게 하지 않는다. 데이터·API 작업의 상세 규칙은 [문서 계약](references/document-contract.md)의 해당 절만 따른다.
 7. 프로젝트용 `AGENTS.md`에 읽기 경계·작업별 문서 표·공통 구현 지침을 생성 또는 병합한다. `- 현재 MVP: [MVP](docs/v<version>/MVP.md)` 한 줄을 현재 대상의 단일 진입점으로 둔다. 새 폴더나 높은 버전 번호만으로 대상을 바꾸지 않는다. 표에는 존재하는 문서와 읽는 조건을 한 번씩 연결하고 별도 링크 모음을 붙이지 않는다. 개별 기능·설정·명령·선정 근거는 소유 문서에만 둔다. 구현자가 이 스킬이나 과거 대화를 읽어야만 이해할 수 있는 지시를 남기지 않는다.
 8. [검토 목록](references/review-checklist.md)으로 변경 문서와 그 문서를 참조하는 항목의 의미·완결성을 검토한다. [자동 검증 안내](references/validation.md)에 따라 번들 `scripts/validate_docs.py`를 대상 프로젝트에 실행해 링크·ID·버전과 지원되는 OpenAPI 항목을 검사한다. PRD만 작성한 경우에도 이 안내의 읽기 범위를 따른다. 추가로 기존 문서/명세 검증기의 도움말·설정을 확인해 파일을 수정하지 않는 검사 모드만 실행할 수 있다. 설치·자동 수정·앱 빌드/실행/테스트를 요구하는 명령은 실행하지 않고 미검증 사유를 기록한다. 구조 검증 통과, 내용 검토, 제품 동작의 검증을 구분하며 자동 검사 통과만으로 Ready로 올리지 않는다.
@@ -36,7 +36,7 @@ metadata:
 | `AGENTS.md` | [AGENTS](assets/templates/AGENTS.md) | 새 체계 또는 읽기 규칙 갱신 |
 | `docs/product/PRD.md` | [PRD](assets/templates/PRD.md) | 제품 기획 |
 | `docs/v<version>/MVP.md` | [MVP](assets/templates/MVP.md) | 요청한 버전 명세 |
-| `docs/implementation/ARCHITECTURE.md` | [ARCHITECTURE](assets/templates/ARCHITECTURE.md) | 구현 전달용 문서 묶음을 작성하거나 기술 선택·초기화·모듈 구조를 변경할 때 |
+| `docs/implementation/ARCHITECTURE.md` | [ARCHITECTURE](assets/templates/ARCHITECTURE.md) | 구현 전달용 문서 묶음을 작성하거나 시스템 구성·기술 선택·초기화·통신·실행·배포 구조를 변경할 때 |
 | `docs/implementation/CONVENTIONS.md` | [CONVENTIONS](assets/templates/CONVENTIONS.md) | 구현 전달용 문서 묶음을 작성하거나 코드 규칙·도구 설정 기준·검사 명령을 변경할 때 |
 | `docs/implementation/DATA_MODEL.md` | [DATA_MODEL](assets/templates/DATA_MODEL.md) | 영속 데이터 저장이 필요할 때 |
 | `docs/implementation/openapi.yaml` | [OpenAPI](assets/templates/openapi.yaml) | HTTP API가 있을 때 |
