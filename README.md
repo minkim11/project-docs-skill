@@ -4,7 +4,7 @@
 
 기획을 이야기하는 동안에는 제품의 장기 방향, 이번 버전의 기능, 기술 선택지, 아직 결정하지 않은 내용이 한 대화에 함께 쌓입니다. 이 중 무엇이 확정됐고 이번 범위가 어디까지인지를 문서로 옮겨야 합니다.
 
-Project Docs는 그 내용을 전체 제품 PRD와 현재 MVP·기술 명세로 작성하고, 기획 변경에 따라 문서를 갱신·검토합니다. 문서의 경로·역할·작성 기준은 스킬에 두고, 프로젝트마다 다른 동작과 기술 결정은 해당 프로젝트 문서에 기록합니다.
+Project Docs는 그 내용을 전체 제품 PRD와 현재 MVP·기술 명세로 작성하고, 기획 변경에 따라 문서를 갱신·검토합니다. 문서의 경로·역할·작성 기준은 스킬에 두고, 제품 동작과 기술 결정은 프로젝트 문서에 기록합니다.
 
 ## 다루는 문제
 
@@ -25,9 +25,53 @@ Codex가 `SKILL.md`의 절차를 따르면서 요청에 해당하는 참고 지�
 3. **담당 문서에 명세 작성** — 요청에 맞춰 PRD·MVP와 기술 문서를 작성합니다. 기술 문서에는 경로와 계약을 기록하고, 아키텍처 선택의 이유는 프로젝트 요구와 연결합니다. HTTP API가 있다면 `openapi.yaml`에 계약을 작성합니다.
 4. **참조와 상태 검토** — REQ·AC ID, 링크, 문서 간 계약을 대조합니다. 사용 가능한 비수정 문서 검사만 실행하고, 변경 문서·현재 상태·남은 미정·검증 범위를 보고합니다.
 
+## 사전 준비
+
+| 도구 | 필요한 경우 |
+|---|---|
+| Python 3.10 이상 | 번들 문서 검증 스크립트 실행 |
+| PyYAML | 번들 스크립트의 OpenAPI YAML·기본 항목 검사 |
+| Node.js 22.12 이상·npm, Redocly CLI 2.x | OpenAPI 전용 규격 검사. HTTP API 명세를 작성할 때 권장 |
+
+검증 도구는 자동 설치하지 않으며, 실행할 수 없는 검사는 미검증으로 보고합니다.
+
+### Python과 YAML 검사
+
+[Python](https://www.python.org/downloads/)을 설치하고 PowerShell에서 확인합니다. 아래 `python`은 문서 검증에 사용할 인터프리터입니다. 명령이 연결되어 있지 않으면 `py` 또는 실제 Python 실행 파일 경로로 바꿉니다.
+
+```powershell
+python --version
+```
+
+OpenAPI 검증에 사용할 Python 환경에 PyYAML을 설치하고 확인합니다.
+
+```powershell
+python -m pip install PyYAML
+python -c "import yaml; print(yaml.__version__)"
+```
+
+### OpenAPI 전용 검증
+
+[Node.js](https://nodejs.org/en/download)를 설치한 뒤 [Redocly CLI](https://redocly.com/redocly-cli)를 전역 설치합니다. Node.js 지원 조건은 [CLI 공식 문서](https://redocly.com/docs/cli)를 따릅니다.
+
+```powershell
+node --version
+npm --version
+npm install --global @redocly/cli@2
+redocly --version
+```
+
+OpenAPI 초안 작성·수정 후 프로젝트 루트에서 [lint 명령](https://redocly.com/docs/cli/commands/lint)의 `spec` 규칙 집합으로 검사합니다.
+
+```powershell
+redocly lint docs/implementation/openapi.yaml --extends spec
+```
+
+Redocly 검사는 번들 Python 스크립트와 별도로 실행합니다.
+
 ## 설치
 
-### 직접 설치: 모든 프로젝트에서 사용
+### Git으로 설치
 
 Windows PowerShell에서 실행합니다. Git이 설치되어 있어야 하며, 비공개 저장소에 접근할 수 있는 GitHub 계정으로 Git 인증이 되어 있어야 합니다.
 
@@ -116,7 +160,7 @@ MVP만 `docs/v0.1/MVP.md`, `docs/v0.2/MVP.md`처럼 버전별로 보관합니다
 
 자동 검사는 생성된 프로젝트 문서를 읽으며 파일을 수정하지 않습니다. 전체 PRD는 기본 검사에서 제외하고, 허용된 기획 작업에서만 명시적으로 포함합니다. 자동 검사 통과가 내용의 타당성 검토를 대신하지는 않습니다.
 
-Python 3.10 이상이 필요합니다. OpenAPI의 YAML·기본 항목 검사는 PyYAML이 이미 있는 환경에서 실행하고, 없으면 해당 검사를 미검증으로 보고합니다. 의존성을 자동 설치하지 않습니다. 실행 명령·검사 범위·한계는 [자동 검증 안내](references/validation.md)에 있습니다.
+필요한 도구와 OpenAPI 전용 검사 예시는 [사전 준비](#사전-준비), 번들 스크립트의 실행 명령·검사 범위·한계는 [자동 검증 안내](references/validation.md)에 있습니다.
 
 ## 제작 의도
 
@@ -125,8 +169,6 @@ Python 3.10 이상이 필요합니다. OpenAPI의 YAML·기본 항목 검사는 
 - 제품의 장기 맥락을 보존하면서 현재 구현 범위를 명확히 구분합니다.
 - 문서별 정보의 담당 위치를 정해 중복과 불일치를 줄입니다.
 - 구현 에이전트가 과거 대화 대신 현재 명세에서 필요한 정보를 찾도록 합니다.
-
-현재 버전은 `0.1.0`이며, 실제 프로젝트 적용 검증 전인 초기 개발 단계입니다.
 
 ## 참고 자료
 
