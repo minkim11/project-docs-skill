@@ -310,6 +310,50 @@ class ValidationTests(unittest.TestCase):
         self.assertTrue({"unknown-id", "api-ref"} <= self.codes())
 
     @unittest.skipUnless(importlib.util.find_spec("yaml"), "PyYAML not installed")
+    def test_api_ref_requires_canonical_array_index(self):
+        contract = API.replace("Note: {type: object}", "Note: {allOf: [{type: object}]}")
+        for index in ("0", "-1", "00", "+0", "1"):
+            with self.subTest(index=index):
+                self.write("docs/implementation/openapi.yaml",
+                           contract.replace("schemas/Note'", f"schemas/Note/allOf/{index}'"))
+                self.assertEqual(set() if index == "0" else {"api-ref"}, self.codes())
+
+    @unittest.skipUnless(importlib.util.find_spec("yaml"), "PyYAML not installed")
+    def test_paths_extensions_are_metadata(self):
+        self.write("docs/implementation/openapi.yaml",
+                   API.replace("paths:\n", "paths:\n  x-note: {$ref: 'opaque-data'}\n"))
+        self.assertEqual([], self.issues())
+
+    @unittest.skipUnless(importlib.util.find_spec("yaml"), "PyYAML not installed")
+    def test_external_ref_violates_single_file_contract(self):
+        for ref in ("", "#"):
+            with self.subTest(ref=ref):
+                self.write("docs/implementation/openapi.yaml", API.replace("#/components/schemas/Note", ref))
+                self.assertEqual([], self.issues())
+        for ref in ("parts.yaml#/Note", "https://example.com/parts.yaml#/Note"):
+            with self.subTest(ref=ref):
+                self.write("docs/implementation/openapi.yaml", API.replace("#/components/schemas/Note", ref))
+                self.assertEqual([("ERROR", "api-single-file")],
+                                 [(level, code) for level, _, code, _ in self.issues()])
+
+    @unittest.skipUnless(importlib.util.find_spec("yaml"), "PyYAML not installed")
+    def test_additional_openapi_files_are_rejected_and_examples_are_allowed(self):
+        self.write("docs/implementation/openapi.yaml", API)
+        self.write("docs/implementation/examples/note.yaml", "note: example\n")
+        self.write("docs/implementation/examples/input.json", '{"openapi": "payload text"}')
+        self.assertEqual([], self.issues())
+        yaml_path = "docs/implementation/parts/notes.yml"
+        json_path = "docs/implementation/another.json"
+        self.write(yaml_path, API)
+        self.write(json_path, '{"openapi": "3.1.0", "paths": {}}')
+        for canonical_exists in (True, False):
+            with self.subTest(canonical_exists=canonical_exists):
+                if not canonical_exists:
+                    (self.root / "docs/implementation/openapi.yaml").unlink()
+                self.assertEqual({("ERROR", yaml_path, "api-single-file"), ("ERROR", json_path, "api-single-file")},
+                                 {(level, path, code) for level, path, code, _ in self.issues()})
+
+    @unittest.skipUnless(importlib.util.find_spec("yaml"), "PyYAML not installed")
     def test_deep_yaml_returns_error_without_traceback(self):
         self.write("docs/implementation/openapi.yaml", "value: " + "[" * 1200 + "0" + "]" * 1200)
         self.assertIn("yaml-depth", self.codes())

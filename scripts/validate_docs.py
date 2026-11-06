@@ -13,6 +13,8 @@ from urllib.parse import unquote, urlsplit
 ID = re.compile(r"\b(?:REQ|AC)-\d{3,}\b")
 METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
 MVP_LOCATION = re.compile(r"docs/v([A-Za-z0-9][A-Za-z0-9._-]*)/MVP\.md")
+OPENAPI_FILE = "docs/implementation/openapi.yaml"
+OPENAPI_VERSION = re.compile(r"3\.\d+\.\d+")
 
 
 def prose(text):
@@ -100,6 +102,7 @@ class Validator:
                 if not self.is_file(relative):
                     self.report("ERROR", relative, "required-file", "Required handoff document is missing.")
         candidates = [self.root / "AGENTS.md"]
+        api_candidates = []
         folders = ["docs/implementation", "docs/decisions"]
         if self.include_product:
             folders.append("docs/product")
@@ -114,6 +117,11 @@ class Validator:
                 for parent, directories, files in os.walk(self.root / folder, onerror=scan_error):
                     directories.sort()
                     candidates.extend(Path(parent) / name for name in sorted(files) if name.endswith(".md"))
+                    if folder == "docs/implementation":
+                        for name in sorted(files):
+                            path = Path(parent) / name
+                            if path.suffix.lower() in {".yaml", ".yml", ".json"} and path != self.root / OPENAPI_FILE:
+                                api_candidates.append(path.relative_to(self.root).as_posix())
             except (OSError, RecursionError) as exc:
                 scan_error(exc)
         for path in candidates:
@@ -128,8 +136,7 @@ class Validator:
         self.select_mvp()
         if self.require_implementation and not self.mvp_path:
             self.report("ERROR", "AGENTS.md", "mvp-selection", "Handoff requires a valid current MVP entry in AGENTS.md.")
-        api = "docs/implementation/openapi.yaml"
-        api_exists = self.is_file(api)
+        api_exists = self.is_file(OPENAPI_FILE)
         if not self.docs and not api_exists:
             self.report("ERROR", ".", "no-docs", "No documents found in selected scope.")
         self.mvp()
@@ -149,8 +156,8 @@ class Validator:
                     for identifier in sorted(set(ID.findall(active)) - self.ids):
                         self.report("ERROR", relative, "unknown-id", f"{identifier} is not defined in current MVP.")
             self.links(relative, body)
-        if api_exists:
-            self.openapi(api)
+        if api_exists or api_candidates:
+            self.openapi_files(api_exists, api_candidates)
         return self.issues
 
     def select_mvp(self):
@@ -253,14 +260,34 @@ class Validator:
             except (OSError, ValueError, RuntimeError) as exc:
                 self.report("ERROR", relative, "link", f"Cannot inspect {target}: {exc}")
 
-    def openapi(self, relative):
-        text = self.read(relative)
-        if text is None:
-            return
+    def openapi_files(self, api_exists, candidates):
         try:
             import yaml
         except ImportError:
-            self.report("SKIP", relative, "yaml-parser", "PyYAML unavailable; YAML and API checks not run. No installation attempted.")
+            path = OPENAPI_FILE if api_exists else "docs/implementation"
+            self.report("SKIP", path, "yaml-parser", "PyYAML unavailable; YAML and API checks not run. No installation attempted.")
+            return
+        if api_exists:
+            self.openapi(OPENAPI_FILE, yaml)
+        for relative in candidates:
+            text = self.read(relative)
+            if text is None:
+                continue
+            try:
+                root = yaml.compose(text, Loader=yaml.SafeLoader)
+            except (yaml.YAMLError, RecursionError):
+                # Only identify standalone API contracts in these auxiliary files.
+                continue
+            if isinstance(root, yaml.MappingNode) and any(
+                isinstance(key, yaml.ScalarNode) and key.value == "openapi"
+                and isinstance(value, yaml.ScalarNode) and OPENAPI_VERSION.fullmatch(value.value)
+                for key, value in root.value
+            ):
+                self.report("ERROR", relative, "api-single-file", f"Keep the API contract in {OPENAPI_FILE}.")
+
+    def openapi(self, relative, yaml):
+        text = self.read(relative)
+        if text is None:
             return
 
         checked_mappings = set()
@@ -292,7 +319,7 @@ class Validator:
         except RecursionError:
             self.report("ERROR", relative, "yaml-depth", "YAML nesting exceeds the parser's supported depth.")
             return
-        if not isinstance(api, dict) or not isinstance(api.get("openapi"), str) or not re.fullmatch(r"3\.\d+\.\d+", api["openapi"]):
+        if not isinstance(api, dict) or not isinstance(api.get("openapi"), str) or not OPENAPI_VERSION.fullmatch(api["openapi"]):
             self.report("ERROR", relative, "api-header", "Expected an OpenAPI mapping and string version.")
             return
         info = api.get("info")
@@ -312,14 +339,21 @@ class Validator:
             node = api
             try:
                 for part in unquote(ref[2:]).split("/"):
+                    if re.search(r"~(?![01])", part):
+                        raise ValueError("Invalid JSON Pointer escape")
                     key = part.replace("~1", "/").replace("~0", "~")
-                    node = node[int(key)] if isinstance(node, list) else node[key]
+                    if isinstance(node, list):
+                        if not re.fullmatch(r"0|[1-9][0-9]*", key):
+                            raise ValueError("Invalid JSON Pointer array index")
+                        node = node[int(key)]
+                    else:
+                        node = node[key]
                 return node
             except (KeyError, IndexError, TypeError, ValueError):
                 self.report("ERROR", relative, "api-ref", f"Unresolved JSON Pointer: {ref}")
                 return None
 
-        named_maps = {"paths", "webhooks", "schemas", "properties", "patternProperties", "$defs", "definitions",
+        named_maps = {"webhooks", "schemas", "properties", "patternProperties", "$defs", "definitions",
                       "dependentSchemas", "dependencies", "responses", "headers", "parameters", "requestBodies",
                       "callbacks", "links", "securitySchemes", "content", "encoding"}
         literals = {"example", "default", "const", "enum"}
@@ -332,15 +366,20 @@ class Validator:
                     continue
                 visited.add(identity)
             if isinstance(node, dict):
-                is_names = kind in {"names", "example-names"}
+                is_names = kind in {"names", "example-names", "path-names"}
                 ref = node.get("$ref") if not is_names else None
                 if isinstance(ref, str):
                     if ref.startswith("#/"):
                         pointer(ref)
-                    else:
-                        self.report("SKIP", relative, "api-ref-scope", f"External or named-anchor reference not resolved: {ref}")
+                    elif ref not in ("", "#"):
+                        if ref.startswith("#"):
+                            self.report("SKIP", relative, "api-ref-scope", f"Named-anchor reference not resolved: {ref}")
+                        else:
+                            self.report("ERROR", relative, "api-single-file", f"Use a same-document $ref: {ref}")
                 for key, value in node.items():
                     if is_names:
+                        if kind == "path-names" and isinstance(key, str) and key.startswith("x-"):
+                            continue
                         pending.append((value, "example-object" if kind == "example-names" else "object"))
                     elif key in literals or (kind == "example-object" and key == "value"):
                         continue
@@ -349,12 +388,16 @@ class Validator:
                     elif key == "examples":
                         if isinstance(value, dict):
                             pending.append((value, "example-names"))
+                    elif key == "paths":
+                        pending.append((value, "path-names"))
                     else:
                         pending.append((value, "names" if key in named_maps else "object"))
             elif isinstance(node, list):
                 pending.extend((value, "object") for value in node)
         seen, operations, referenced_items = set(), 0, False
         for path, item in paths.items():
+            if isinstance(path, str) and path.startswith("x-"):
+                continue
             if not isinstance(path, str) or not path.startswith("/") or not isinstance(item, dict):
                 self.report("ERROR", relative, "api-path", f"Invalid path item: {path}")
                 continue

@@ -10,8 +10,9 @@
 python -B "<skill-dir>/scripts/validate_docs.py" "<project-root>"
 ```
 
-- 기본 대상: 루트 `AGENTS.md`의 `- 현재 MVP: [MVP](docs/v<version>/MVP.md)` 한 줄이 지정한 MVP, 공통 `docs/implementation/`와 `docs/decisions/`의 Markdown, 공통 `docs/implementation/openapi.yaml`. MVP 경로는 프로젝트 루트 기준으로 쓰고 앵커·쿼리는 붙이지 않는다. 파일은 기계적으로 검사하며 모든 내용을 에이전트 대화에 다시 로딩하지 않는다.
-- 기본 제외: 선택하지 않은 모든 버전의 MVP, `docs/product/`, `docs/archive/`, 소스·설정 파일의 내용. 링크 대상은 존재 여부만 확인하고, Markdown 앵커도 이미 검사 범위에 포함된 문서에서만 대조한다. 범위 밖 앵커를 확인하려고 과거·후보 MVP나 PRD를 열지 않는다. 버전 폴더를 일괄 읽거나 가장 높은 버전을 자동 선택하지 않는다.
+- 루트 `AGENTS.md`에서 `- 현재 MVP: [MVP](docs/v<version>/MVP.md)` 한 줄이 지정한 MVP와 `docs/implementation/`, `docs/decisions/`의 Markdown을 검사한다. MVP 경로는 프로젝트 루트 기준으로 쓰고 앵커·쿼리는 붙이지 않는다.
+- `docs/implementation/openapi.yaml`을 API 계약으로 검사한다. 같은 폴더 트리의 다른 YAML·JSON 파일은 최상위 `openapi` 3.x 버전을 확인해 별도 계약인지 식별한다. 일반 자료와 예시는 이 검사에서 허용한다. 파일은 기계적으로 검사하며 전체 내용을 에이전트 대화에 로딩하지 않는다.
+- 선택하지 않은 MVP, `docs/product/`, `docs/archive/`, 검사 범위 밖의 소스·설정 파일은 제외한다. 링크 대상은 존재 여부를 확인하고, Markdown 앵커는 이미 읽은 문서에서만 대조한다.
 - `--mvp docs/v0.2/MVP.md`: AGENTS의 현재 대상 대신 명시한 MVP만 검사한다. 다음 버전 후보나 별도로 요청한 과거 MVP의 문서 검토에 사용하며, AGENTS·공통 문서를 자동 변경하지 않는다. 공통 명세의 적용 버전이 다르면 불일치로 보고한다. 통과시키기 위해 현재 포인터나 공통 계약을 임의로 바꾸지 않는다. 다른 버전이 필요한 검토에서는 사용자의 요청 범위가 해당 문서 읽기를 허용하는지 먼저 확인한다.
 - `--include-product`: 사용자 요청이 허용한 제품 기획·PRD 작성/갱신·MVP 작성/범위 수정에서 제품 문서도 검사할 때만 지정한다. 기술 명세 수정·구현 명세 검토에는 사용하지 않는다. PRD만 있는 프로젝트는 이 옵션으로 검사하고 구현 문서를 추가 생성하지 않는다.
 - `--require-implementation`: 구현 전달용 문서 묶음 전체를 검토할 때 지정한다. AGENTS·선택한 MVP·공통 ARCHITECTURE·CONVENTIONS의 존재를 요구한다. 이 모드에서는 AGENTS의 현재 MVP 한 줄도 반드시 유효해야 하며, `--mvp`를 함께 지정하면 두 대상이 같아야 한다. 다른 버전 후보를 검토할 때는 이 옵션을 붙이지 않는다. 일부 문서 작성이나 PRD 단독 작업에도 지정하지 않는다. DATA_MODEL·OpenAPI·ADR의 필요성은 에이전트가 요구사항으로 판단하며, 스크립트가 파일 부재만 보고 불필요하다고 판정하지 않는다.
@@ -27,7 +28,7 @@ AGENTS의 지정이 모호하거나 잘못되면 ERROR, 지정이 없고 공통 
 | Markdown | 코드 펜스·HTML 주석 밖의 `{{안내문}}` 잔존, 일반 인라인 링크와 참조 링크 정의의 로컬 대상 존재 여부, 검사 범위 내 Markdown의 제목 앵커·명시적 HTML id |
 | MVP | 폴더·헤더 버전 일치, Draft/Ready 표기, `REQ-NNN` 제목 정의와 `완료 기준` 표의 `AC-NNN` 정의, 선택한 MVP 안의 정의 중복, AC의 REQ 연결과 빈 완료 조건, AC 없는 REQ |
 | 공통 기술 문서·AGENTS | 선택한 MVP에 없는 REQ/AC 참조. 기술 Markdown의 `적용 MVP:` 표기와 선택 버전 일치 여부 |
-| OpenAPI — 파서가 있을 때 | YAML 파싱·중복 키, OpenAPI 3.x 버전 표기, 제목·계약 버전, 비어 있지 않은 paths, 인라인 HTTP 작업의 operationId 존재·중복과 x-requirements 형식·현재 ID 참조, 검사 가능한 문서 내부 JSON Pointer `$ref` |
+| OpenAPI — 파서가 있을 때 | YAML 파싱·중복 키, OpenAPI 3.x 버전 표기, 제목·계약 버전, 비어 있지 않은 paths, 인라인 HTTP 작업의 operationId·x-requirements·현재 ID 참조, 내부 JSON Pointer `$ref`, 외부 `$ref`와 추가 독립 명세 여부 |
 
 ID 정의는 템플릿과 같이 MVP의 `### REQ-001 — 제목`, `## 완료 기준` 아래 표의 첫 열 `AC-001`·둘째 열 관련 REQ에 작성한다. 다른 문서의 같은 ID는 정의가 아닌 참조다. MVP의 변경 요약과 ADR은 과거 요구를 설명할 수 있어 현재 ID 존재 검사를 강제하지 않는다. API 계약의 `info.version`은 MVP 버전과 같을 필요가 없다.
 
@@ -47,7 +48,7 @@ OpenAPI 검사는 실행한 Python 환경에 **PyYAML이 이미 있을 때만** 
 
 - 표현이 다른 문장의 의미상 중복, 제품·API·저장 제약의 의미상 정합성, 요구사항의 타당성·완결성, 기술 선택에 필요한 ADR 누락, 환경별 DB 값 고정과 테스트 격리의 타당성, 미정의 실제 차단 여부, 사용자 합의·Ready 조건, 다른 버전에서 폐기한 ID의 재사용 여부. 다른 버전은 읽지 않으므로 같은 ID의 버전 간 등장도 중복 정의로 판정하지 않는다.
 - 전체 Markdown 문법. 괄호를 중첩한 링크 주소·사용자 정의 앵커 생성 규칙 등 복잡한 표현은 별도 확인한다. 미정의 참조 링크 라벨 사용까지 모두 검사하지 않는다.
-- 전체 OpenAPI/JSON Schema 적합성, 예시와 스키마의 일치, 인증·응답의 충분성. 외부 파일/URL 및 이름 기반 앵커 `$ref`, 참조로 연결된 Path Item의 작업 검사는 SKIP한다. 실제 예시 값·default·const·enum·스키마 examples 배열·사용자 정의 x- 확장 값 안의 데이터는 `$ref` 검사에서 제외하며 callbacks·webhooks의 operationId/x-requirements도 자동 확인하지 않는다. 전용 검증기가 필요하다.
+- 전체 OpenAPI/JSON Schema 적합성, 예시와 스키마의 일치, 인증·응답의 충분성. 내부 이름 기반 앵커 `$ref`와 참조로 연결된 Path Item의 작업 검사는 SKIP한다. 실제 예시 값·default·const·enum·스키마 examples 배열·사용자 정의 x- 확장 값 안의 데이터는 `$ref` 검사에서 제외하며 callbacks·webhooks의 operationId/x-requirements도 자동 확인하지 않는다. 전용 검증기가 필요하다.
 - 코드·DB 스키마와 문서의 실제 일치, 실행 결과, 토큰 절감.
 
 내용 판단은 [리뷰 체크리스트](review-checklist.md)로 수행한다. 예를 들어 없는 REQ를 가리키는 API는 자동으로 찾을 수 있지만, 유효한 REQ를 연결한 API가 실제로 다른 동작을 규정하는지는 에이전트가 검토해야 한다. 완성 문서에서 발견한 오류만 요청 범위 안에서 수정하고, 스크립트 한계로 판정할 수 없는 항목은 수동 검토 결과로 보고한다.
