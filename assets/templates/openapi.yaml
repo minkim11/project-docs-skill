@@ -2,6 +2,9 @@
 # paths가 비어 있는 상태를 구현 가능한 API 계약으로 전달하지 않는다.
 # 인증 방식이 합의되면 securitySchemes와 security를 명시한다.
 # 각 operation에 고유 operationId와 현재 MVP에 존재하는 REQ/AC ID 배열인 x-requirements를 부여한다.
+# 전체 HTTP 계약은 이 단일 파일에서 관리하고 공통 모델·응답·헤더는 내부 components/$ref로 재사용한다.
+# schema의 제약을 description에 반복하지 않고 schema로 표현하기 어려운 의미만 설명한다.
+# 예시는 최소 대표 사례만 두며 인증·CORS·캐시 정책의 공통 설명은 한 곳에 정의한다.
 openapi: 3.1.0
 info:
   title: "{{프로젝트 API 이름}}"

@@ -19,10 +19,12 @@
 | [아키텍처](docs/implementation/ARCHITECTURE.md) | 초기화·구조·연동·실행·배포·설정 변경 | 관련 생성 선택값·구성 요소·의존 방향·통신·실행·배포 구조 |
 | [컨벤션](docs/implementation/CONVENTIONS.md) | 코드 작성·수정·검사 | 적용 규칙·도구 설정·검사 명령 |
 | [데이터 모델](docs/implementation/DATA_MODEL.md) | 저장·파일 입력 변경 | 관련 엔티티·입력 계약·불변조건과 스키마 |
-| [OpenAPI](docs/implementation/openapi.yaml) | HTTP 구현·연동·계약 검사 | 해당 operationId와 참조 schema·응답 |
+| [OpenAPI](docs/implementation/openapi.yaml) | HTTP 구현·연동·계약 검사 | 대상 HTTP 작업과 적용되는 공통 정의 |
 | [ADR 인덱스](docs/decisions/INDEX.md) | 설계 변경 이유 확인 | 해당 영역의 Accepted ADR만 선택 |
 
 처음에는 현재 MVP의 목표·범위를 확인하고, 이후에는 위 표에서 작업에 필요한 절만 읽는다. 오타·포맷만 바꾸면 대상 파일과 해당 규칙만 읽는다. 문서의 링크를 재귀적으로 따라가며 다른 문서를 일괄 로딩하지 않는다.
+
+OpenAPI는 operationId 또는 HTTP 메서드·경로로 대상을 찾고 해당 작업, 적용되는 공통 인증·HTTP 정책, 필요한 내부 `$ref` 정의만 읽는다. 중첩 참조는 계약 이해에 필요한 범위까지 확인하며 무관한 작업·components나 파일 전체를 기본으로 읽지 않는다.
 
 공식 근거 링크는 선정 출처이며 기본 구현 읽기 대상이 아니다. 명세 부족·충돌·사용법 또는 버전 문제 확인이 필요할 때만 관련 공식 자료를 조회한다. 외부 코드 스타일 가이드는 컨벤션 선정·변경에서만 확인한다.
 

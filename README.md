@@ -141,7 +141,7 @@ $project-docs 지금까지 합의한 기획으로 전체 PRD와 MVP 0.1, 관련 
 | `docs/implementation/ARCHITECTURE.md` | 전체 구성, 기술스택, 패키지 구조·의존 방향, 통신·실행 구조, 필요한 배포 설계와 초기화 선택값 |
 | `docs/implementation/CONVENTIONS.md` | 코드 규칙, 포매터·린터 설정 기준, 검사 명령 |
 | `docs/implementation/DATA_MODEL.md` | 저장 구조, ERD, 필드·관계·제약조건 |
-| `docs/implementation/openapi.yaml` | HTTP API 요청·응답·인증·오류 계약 |
+| `docs/implementation/openapi.yaml` | HTTP API 요청·응답·인증·오류 계약을 단일 파일로 관리 |
 | `docs/decisions/` | 여러 대안 중 선택한 기술 결정의 이유·트레이드오프·재검토 조건과 인덱스. 초기화·빌드 설정도 포함 |
 | `AGENTS.md` | 읽기 경계, 작업별 참고 문서와 검증 지침 |
 
